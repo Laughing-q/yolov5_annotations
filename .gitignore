@@ -30,6 +30,7 @@ data/*
 !data/images/bus.jpg
 !data/*.sh
 temp.py
+1.py
 
 results*.txt
 

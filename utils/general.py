@@ -63,6 +63,7 @@ def set_logging(rank=-1, verbose=True):
 
 
 def init_seeds(seed=0):
+    """设置固定随机种子"""
     # Initialize random number generator (RNG) seeds
     random.seed(seed)
     np.random.seed(seed)
@@ -70,17 +71,21 @@ def init_seeds(seed=0):
 
 
 def get_latest_run(search_dir='.'):
+    """获取最新一次训练下的last.pt，方便resume
+    os.path.getctime获取文件的创建时间"""
     # Return path to most recent 'last.pt' in /runs (i.e. to --resume from)
     last_list = glob.glob(f'{search_dir}/**/last*.pt', recursive=True)
     return max(last_list, key=os.path.getctime) if last_list else ''
 
 
 def is_docker():
+    """是否为docker环境"""
     # Is environment a Docker container?
     return Path('/workspace').exists()  # or Path('/.dockerenv').exists()
 
 
 def is_colab():
+    """判断是否为google colab环境"""
     # Is environment a Google Colab instance?
     try:
         import google.colab
@@ -90,21 +95,27 @@ def is_colab():
 
 
 def is_pip():
+    """判断文件是否为一个pip包
+    Path(__file__).absolute().parts, 将当前文件路径划分为元组
+    example：/home/laughing/yolov5/train.py -> ('/', 'home', 'laughing', 'yolov5', 'train.py')"""
     # Is file in a pip package?
     return 'site-packages' in Path(__file__).absolute().parts
 
 
 def emojis(str=''):
+    """这里是按照系统来选取str，使在不同系统都能够打印表情"""
     # Return platform-dependent emoji-safe version of string
     return str.encode().decode('ascii', 'ignore') if platform.system() == 'Windows' else str
 
 
 def file_size(file):
+    """获取文件大小, 单位MB"""
     # Return file size in MB
     return Path(file).stat().st_size / 1e6
 
 
 def check_online():
+    """检查网络是否连接"""
     # Check internet connectivity
     import socket
     try:
@@ -115,16 +126,25 @@ def check_online():
 
 
 def check_git_status(err_msg=', for updates see https://github.com/ultralytics/yolov5'):
+    """检查当前代码是否为最新"""
     # Recommend 'git pull' if code is out of date
+    # colorstr函数可改变“github:”字体颜色，具体查看colorstr注释
     print(colorstr('github: '), end='')
     try:
+        # 判断文件夹是否存在.git文件夹(git管理的文件夹)
         assert Path('.git').exists(), 'skipping check (not a git repository)'
+        # 判断是否为docker环境
         assert not is_docker(), 'skipping check (Docker image)'
+        # 判断是否联网
         assert check_online(), 'skipping check (offline)'
 
         cmd = 'git fetch && git config --get remote.origin.url'
+        # check_output:shell命令，并返回结果
+        # 将最新的代码拉取到本地，并返回代码地址url
         url = check_output(cmd, shell=True, timeout=5).decode().strip().rstrip('.git')  # git fetch
+        # 获取当前分支名branch
         branch = check_output('git rev-parse --abbrev-ref HEAD', shell=True).decode().strip()  # checked out
+        # 返回落后的提交数
         n = int(check_output(f'git rev-list {branch}..origin/master --count', shell=True))  # commits behind
         if n > 0:
             s = f"⚠️ WARNING: code is out of date by {n} commit{'s' * (n > 1)}. " \
@@ -137,26 +157,35 @@ def check_git_status(err_msg=', for updates see https://github.com/ultralytics/y
 
 
 def check_python(minimum='3.6.2'):
+    """检查当前python版本是否满足要求
+    platform.python_version()获取当前python版本"""
     # Check current python version vs. required python version
     check_version(platform.python_version(), minimum, name='Python ')
 
 
 def check_version(current='0.0.0', minimum='0.0.0', name='version ', pinned=False):
+    """检测当前环境的版本是否满足要求"""
     # Check version vs. required version
     current, minimum = (pkg.parse_version(x) for x in (current, minimum))
+    # 如果pinned=True则要求环境版本要一致，否则只要大于等于即可
     result = (current == minimum) if pinned else (current >= minimum)
     assert result, f'{name}{minimum} required by YOLOv5, but {name}{current} is currently installed'
 
 
 def check_requirements(requirements='requirements.txt', exclude=()):
+    """检查当前环境是够满足要求"""
     # Check installed dependencies meet requirements (pass *.txt file or list of packages)
+    # 将requirements显示这是为红色
     prefix = colorstr('red', 'bold', 'requirements:')
+    # 检查python环境是否满足要求
     check_python()  # check python version
     if isinstance(requirements, (str, Path)):  # requirements.txt file
         file = Path(requirements)
+        # 不存在requirements则直接返回
         if not file.exists():
             print(f"{prefix} {file.resolve()} not found, check failed.")
             return
+        # TODO
         requirements = [f'{x.name}{x.specifier}' for x in pkg.parse_requirements(file.open()) if x.name not in exclude]
     else:  # list or tuple of packages
         requirements = [x for x in requirements if x not in exclude]
@@ -182,7 +211,9 @@ def check_requirements(requirements='requirements.txt', exclude=()):
 
 
 def check_img_size(img_size, s=32):
+    """检查image大小, 保证img_size能整除s(32)"""
     # Verify img_size is a multiple of stride s
+    # 是img_size可以整除s
     new_size = make_divisible(img_size, int(s))  # ceil gs-multiple
     if new_size != img_size:
         print('WARNING: --img-size %g must be multiple of max stride %g, updating to %g' % (img_size, s, new_size))
@@ -190,6 +221,7 @@ def check_img_size(img_size, s=32):
 
 
 def check_imshow():
+    """检查当前环境是否满足cv2.imshow"""
     # Check if environment supports image displays
     try:
         assert not is_docker(), 'cv2.imshow() is disabled in Docker environments'
@@ -205,18 +237,23 @@ def check_imshow():
 
 
 def check_file(file):
+    """检查file"""
     # Search/download file (if necessary) and return path
     file = str(file)  # convert to str()
+    # 判断当前文件是否存在，存在则直接返回
     if Path(file).is_file() or file == '':  # exists
         return file
+    # 如果file以http或https开头，则自动下载该文件
     elif file.startswith(('http:/', 'https:/')):  # download
         url = str(Path(file)).replace(':/', '://')  # Pathlib turns :// -> :/
         file = Path(urllib.parse.unquote(file)).name.split('?')[0]  # '%2F' to '/', split https://url.com/file.txt?auth
         print(f'Downloading {url} to {file}...')
         torch.hub.download_url_to_file(url, file)
+        # 下载之后判断该文件是否存在，并文件大小大于0
         assert Path(file).exists() and Path(file).stat().st_size > 0, f'File download failed: {url}'  # check
         return file
     else:  # search
+        # 在当前目录下搜索该文件
         files = glob.glob('./**/' + file, recursive=True)  # find file
         assert len(files), f'File not found: {file}'  # assert file was found
         assert len(files) == 1, f"Multiple files match '{file}', specify exact path: {files}"  # assert unique
@@ -224,18 +261,23 @@ def check_file(file):
 
 
 def check_dataset(data, autodownload=True):
+    """检查dataset"""
     # Download dataset if not found locally
+    # 获取数据集所在的path, 来自数据集配置文件data.yaml, 没有path返回‘’
     path = Path(data.get('path', ''))  # optional 'path' field
     if path:
         for k in 'train', 'val', 'test':
             if data.get(k):  # prepend path
+                # 获取train,val,test数据路径, 与path路径拼接
                 data[k] = str(path / data[k]) if isinstance(data[k], str) else [str(path / x) for x in data[k]]
 
     train, val, test, s = [data.get(x) for x in ('train', 'val', 'test', 'download')]
     if val:
+        # Path(x).resolve获取x的绝对路径，解析其中的所有符号连接，并规范化
         val = [Path(x).resolve() for x in (val if isinstance(val, list) else [val])]  # val path
         if not all(x.exists() for x in val):
             print('\nWARNING: Dataset not found, nonexistent paths: %s' % [str(x) for x in val if not x.exists()])
+            # 如果val文件夹不存在，且yaml文件中有download选项，且设置autodownload，则自动下载
             if s and autodownload:  # download script
                 if s.startswith('http') and s.endswith('.zip'):  # URL
                     f = Path(s).name  # filename

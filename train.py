@@ -559,7 +559,9 @@ def main(opt):
     set_logging(RANK)
     if RANK in [-1, 0]:
         print(colorstr('train: ') + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
+        # 检查你的代码版本是否为最新的(不适用于windows系统)
         check_git_status()
+        # 检查你的环境是否满足要求
         check_requirements(exclude=['thop'])
 
     # Resume
@@ -580,6 +582,7 @@ def main(opt):
         opt.save_dir = str(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok or opt.evolve))
 
     # DDP mode
+    # 选择设备
     device = select_device(opt.device, batch_size=opt.batch_size)
     if LOCAL_RANK != -1:
         from datetime import timedelta

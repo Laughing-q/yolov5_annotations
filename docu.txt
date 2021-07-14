@@ -1,0 +1,13 @@
+os.path.getctime(path):返回path的创建时间；
+platform.system():获取当前系统；
+platform.python_version(): 获取当前python版本
+
+Path(file).stat().st_size / 1e6 :获取文件大小，单位MB；
+socket.create_connection(("1.1.1.1", 443), 5) : 可用来检测网络是否连接；
+subprocess.check_output(cmd, shell=True): 执行shell命令且返回结果；
+
+pkg_resources.require(env=None, installer=None):将返回当前包的依赖包
+
+glob.glob('/home/laughing/Documents/**', recursive=True): 返回当前文件夹所有文件，recursive表示递归；
+glob.glob('./**/' + file, recursive=True): 返回当前文件夹所有的file；
+
