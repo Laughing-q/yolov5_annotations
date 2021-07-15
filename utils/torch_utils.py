@@ -24,12 +24,13 @@ except ImportError:
     thop = None
 logger = logging.getLogger(__name__)
 
-
+# 使用contextmanager装饰器创建上下文管理器，上下文管理器与with使用
 @contextmanager
 def torch_distributed_zero_first(local_rank: int):
     """
     Decorator to make all processes in distributed training wait for each local_master to do something.
     """
+    # dist.barrier()不同进程之间的数据同步
     if local_rank not in [-1, 0]:
         dist.barrier()
     yield
@@ -38,21 +39,26 @@ def torch_distributed_zero_first(local_rank: int):
 
 
 def init_torch_seeds(seed=0):
+    """设置torch随机种子"""
     # Speed-reproducibility tradeoff https://pytorch.org/docs/stable/notes/randomness.html
     torch.manual_seed(seed)
     if seed == 0:  # slower, more reproducible
+        # 将卷积算法选择以及算法操作等设置为确定的,但是速度会更慢
+        # 详情见https://pytorch.org/docs/stable/notes/randomness.html
         cudnn.benchmark, cudnn.deterministic = False, True
     else:  # faster, less reproducible
         cudnn.benchmark, cudnn.deterministic = True, False
 
 
 def date_modified(path=__file__):
+    """以固定格式(year-month-day)返回文件最后一次修改的时间"""
     # return human-readable file modification date, i.e. '2021-3-26'
     t = datetime.datetime.fromtimestamp(Path(path).stat().st_mtime)
     return f'{t.year}-{t.month}-{t.day}'
 
 
 def git_describe(path=Path(__file__).parent):  # path must be a directory
+    """获取当前git提交版本"""
     # return human-readable git description, i.e. v5.0-5-g3e25f1e https://git-scm.com/docs/git-describe
     s = f'git -C {path} describe --tags --long --always'
     try:
@@ -62,11 +68,13 @@ def git_describe(path=Path(__file__).parent):  # path must be a directory
 
 
 def select_device(device='', batch_size=None):
+    """选择设备device"""
     # device = 'cpu' or '0' or '0,1,2,3'
     s = f'YOLOv5 🚀 {git_describe() or date_modified()} torch {torch.__version__} '  # string
     device = str(device).strip().lower().replace('cuda:', '')  # to string, 'cuda:0' to '0'
     cpu = device == 'cpu'
     if cpu:
+        # 设置不使用gpu
         os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # force torch.cuda.is_available() = False
     elif device:  # non-cpu device requested
         os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
@@ -75,11 +83,14 @@ def select_device(device='', batch_size=None):
     cuda = not cpu and torch.cuda.is_available()
     if cuda:
         devices = device.split(',') if device else '0'  # range(torch.cuda.device_count())  # i.e. 0,1,6,7
+        # gpu数量
         n = len(devices)  # device count
+        # 检查batchsize是否能整除gpu数
         if n > 1 and batch_size:  # check batch_size is divisible by device_count
             assert batch_size % n == 0, f'batch-size {batch_size} not multiple of GPU count {n}'
         space = ' ' * (len(s) + 1)
         for i, d in enumerate(devices):
+            # 获取设备信息，名字，显存
             p = torch.cuda.get_device_properties(i)
             s += f"{'' if i == 0 else space}CUDA:{d} ({p.name}, {p.total_memory / 1024 ** 2}MB)\n"  # bytes to MB
     else:
@@ -90,13 +101,16 @@ def select_device(device='', batch_size=None):
 
 
 def time_synchronized():
+    """获取当前时间"""
     # pytorch-accurate time
     if torch.cuda.is_available():
+        # 等待当前设备上所有流中的所有核心完成
         torch.cuda.synchronize()
     return time.time()
 
 
 def profile(x, ops, n=100, device=None):
+    """计算某个操作ops的前向推理时间，反向传播时间, flops, 参数量"""
     # profile a pytorch module or list of modules. Example usage:
     #     x = torch.randn(16, 3, 640, 640)  # input
     #     m1 = lambda x: x * torch.sigmoid(x)
@@ -113,6 +127,7 @@ def profile(x, ops, n=100, device=None):
         m = m.half() if hasattr(m, 'half') and isinstance(x, torch.Tensor) and x.dtype is torch.float16 else m  # type
         dtf, dtb, t = 0., 0., [0., 0., 0.]  # dt forward, backward
         try:
+            # 计算flops
             flops = thop.profile(m, inputs=(x,), verbose=False)[0] / 1E9 * 2  # GFLOPs
         except:
             flops = 0
@@ -136,21 +151,25 @@ def profile(x, ops, n=100, device=None):
 
 
 def is_parallel(model):
+    """判断是否为DP、DDP模型"""
     # Returns True if model is of type DP or DDP
     return type(model) in (nn.parallel.DataParallel, nn.parallel.DistributedDataParallel)
 
 
 def de_parallel(model):
+    """如果模型是DP、DDP模型，返回单gpu的模型"""
     # De-parallelize a model: returns single-GPU model if model is of type DP or DDP
     return model.module if is_parallel(model) else model
 
 
 def intersect_dicts(da, db, exclude=()):
+    """返回da的键包含在db中，但不在exclude中的字典"""
     # Dictionary intersection of matching keys and shapes, omitting 'exclude' keys, using da values
     return {k: v for k, v in da.items() if k in db and not any(x in k for x in exclude) and v.shape == db[k].shape}
 
 
 def initialize_weights(model):
+    """初始化网络权重"""
     for m in model.modules():
         t = type(m)
         if t is nn.Conv2d:
@@ -163,11 +182,15 @@ def initialize_weights(model):
 
 
 def find_modules(model, mclass=nn.Conv2d):
+    """返回模型中模块的索引
+    model为模型
+    mclass为子模块，如nn.Conv2d"""
     # Finds layer indices matching module class 'mclass'
     return [i for i, m in enumerate(model.module_list) if isinstance(m, mclass)]
 
 
 def sparsity(model):
+    """返回模型的稀疏性，也就是模型中参数为0的数量占参数总量的比例"""
     # Return global model sparsity
     a, b = 0., 0.
     for p in model.parameters():
@@ -177,18 +200,24 @@ def sparsity(model):
 
 
 def prune(model, amount=0.3):
+    """模型剪枝，
+    amount为剪枝比例"""
     # Prune model to requested global sparsity
     import torch.nn.utils.prune as prune
     print('Pruning model... ', end='')
     for name, m in model.named_modules():
         if isinstance(m, nn.Conv2d):
+            # 剪枝weight中L1范数最小amount比例的单元
             prune.l1_unstructured(m, name='weight', amount=amount)  # prune
+            # 剪枝永久化, 相当于是将裁剪后的模型参数应用到模型上, 剪枝对应的参数变为0
             prune.remove(m, 'weight')  # make permanent
     print(' %.3g global sparsity' % sparsity(model))
 
 
 def fuse_conv_and_bn(conv, bn):
+    """融合conv与bn层"""
     # Fuse convolution and batchnorm layers https://tehnokv.com/posts/fusing-batchnorm-and-conv/
+    # 初始化一个新的conv，然后将重参数的结果加载进去
     fusedconv = nn.Conv2d(conv.in_channels,
                           conv.out_channels,
                           kernel_size=conv.kernel_size,
@@ -211,6 +240,7 @@ def fuse_conv_and_bn(conv, bn):
 
 
 def model_info(model, verbose=False, img_size=640):
+    """显示模型的信息，网络层信息，参数量，梯度量, FLOPs"""
     # Model information. img_size may be int or list, i.e. img_size=640 or img_size=[640, 320]
     n_p = sum(x.numel() for x in model.parameters())  # number parameters
     n_g = sum(x.numel() for x in model.parameters() if x.requires_grad)  # number gradients
@@ -235,6 +265,7 @@ def model_info(model, verbose=False, img_size=640):
 
 
 def load_classifier(name='resnet101', n=2):
+    """创建分类器"""
     # Loads a pretrained model reshaped to n-class output
     model = torchvision.models.__dict__[name](pretrained=True)
 
@@ -254,6 +285,12 @@ def load_classifier(name='resnet101', n=2):
 
 
 def scale_img(img, ratio=1.0, same_shape=False, gs=32):  # img(16,3,256,416)
+    """缩放tensor
+    img：需要缩放的tensor，shape为[batch-size, channle, h, w]
+    ratio: 缩放率
+    same_shape:缩放后，是否pad回原img大小
+    gs:缩放后size需要整除gs
+    """
     # scales img(bs,3,y,x) by ratio constrained to gs-multiple
     if ratio == 1.0:
         return img
@@ -267,6 +304,10 @@ def scale_img(img, ratio=1.0, same_shape=False, gs=32):  # img(16,3,256,416)
 
 
 def copy_attr(a, b, include=(), exclude=()):
+    """将b的属性复制给a, 
+    include:复制include中的
+    exclude:排除exclude中的
+    """
     # Copy attributes from b to a, options to only include [...] and to exclude [...]
     for k, v in b.__dict__.items():
         if (len(include) and k not in include) or k.startswith('_') or k in exclude:
@@ -276,6 +317,7 @@ def copy_attr(a, b, include=(), exclude=()):
 
 
 class ModelEMA:
+    """训练的时候对模型进行指数滑动平均EMA"""
     """ Model Exponential Moving Average from https://github.com/rwightman/pytorch-image-models
     Keep a moving average of everything in the model state_dict (parameters and buffers).
     This is intended to allow functionality like
@@ -287,10 +329,13 @@ class ModelEMA:
 
     def __init__(self, model, decay=0.9999, updates=0):
         # Create EMA
+        # 创建EMA
         self.ema = deepcopy(model.module if is_parallel(model) else model).eval()  # FP32 EMA
         # if next(model.parameters()).device.type != 'cpu':
         #     self.ema.half()  # FP16 EMA
+        # 更新的次数
         self.updates = updates  # number of EMA updates
+        # 衰减公式
         self.decay = lambda x: decay * (1 - math.exp(-x / 2000))  # decay exponential ramp (to help early epochs)
         for p in self.ema.parameters():
             p.requires_grad_(False)
@@ -302,6 +347,7 @@ class ModelEMA:
             d = self.decay(self.updates)
 
             msd = model.module.state_dict() if is_parallel(model) else model.state_dict()  # model state_dict
+            # 对模型进行滑动平均
             for k, v in self.ema.state_dict().items():
                 if v.dtype.is_floating_point:
                     v *= d
@@ -309,4 +355,5 @@ class ModelEMA:
 
     def update_attr(self, model, include=(), exclude=('process_group', 'reducer')):
         # Update EMA attributes
+        # 复制model的属性给EMA
         copy_attr(self.ema, model, include, exclude)
