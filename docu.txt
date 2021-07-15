@@ -29,3 +29,6 @@ cv2.LUT(x, table): 以x中的值为索引取根据table中的值；
 cv2.createCLAHA(clipLimit=8.0, titleGridSize=(8, 8))  用于生成自适应均衡化图像, clipLimit颜色对比度的阈值， titleGridSize进行像素均衡化的网格大小，即在多少网格下进行直方图的均衡化操作
 
 YUV:“Y”表示明亮度（Luminance或Luma），也就是灰阶值，“U”和“V”表示的则是色度（Chrominance或Chroma);
+
+np.array([1, 2, 3]).data.contiguous:判断数组是否为内存连续；
+

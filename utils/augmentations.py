@@ -246,13 +246,21 @@ def random_perspective(im, targets=(), segments=(), degrees=10, translate=.1, sc
 
 
 def copy_paste(im, labels, segments, p=0.5):
+    """通过segment标签粘贴目标到其他图片
+    im:图片
+    labels:[N, 5], cls, box:xyxy
+    p:概率
+    """
     # Implement Copy-Paste augmentation https://arxiv.org/abs/2012.07177, labels as nx5 np.array(cls, xyxy)
     n = len(segments)
+    # p != 0且存在segment标签
     if p and n:
         h, w, c = im.shape  # height, width, channels
         im_new = np.zeros(im.shape, np.uint8)
+        # 从标签中随机选取p*n个目标
         for j in random.sample(range(n), k=round(p * n)):
             l, s = labels[j], segments[j]
+            # TODO
             box = w - l[3], l[2], w - l[1], l[4]
             ioa = bbox_ioa(box, labels[:, 1:5])  # intersection over area
             if (ioa < 0.30).all():  # allow 30% obscuration of existing labels
@@ -270,12 +278,18 @@ def copy_paste(im, labels, segments, p=0.5):
 
 
 def cutout(im, labels, p=0.5):
-    # TODO
+    """cutout数据增强, 给图片随机添加随机大小的方块噪声
+    im:图片
+    labels:[N, 5], cls, box:xyxy
+    p:概率
+    """
     # Applies image cutout augmentation https://arxiv.org/abs/1708.04552
     if random.random() < p:
         h, w = im.shape[:2]
+        # 设置cutout添加噪声的scale
         scales = [0.5] * 1 + [0.25] * 2 + [0.125] * 4 + [0.0625] * 8 + [0.03125] * 16  # image size fraction
         for s in scales:
+            # 随机生成噪声
             mask_h = random.randint(1, int(h * s))  # create random masks
             mask_w = random.randint(1, int(w * s))
 
@@ -286,21 +300,33 @@ def cutout(im, labels, p=0.5):
             ymax = min(h, ymin + mask_h)
 
             # apply random color mask
+            # 添加随机颜色的噪声
             im[ymin:ymax, xmin:xmax] = [random.randint(64, 191) for _ in range(3)]
 
             # return unobscured labels
             if len(labels) and s > 0.03:
                 box = np.array([xmin, ymin, xmax, ymax], dtype=np.float32)
+                # 计算噪声box与标签交集/标签的面积
                 ioa = bbox_ioa(box, labels[:, 1:5])  # intersection over area
+                # 保留cutout噪声遮挡小于60%的标签
                 labels = labels[ioa < 0.60]  # remove >60% obscured labels
 
     return labels
 
 
 def mixup(im, labels, im2, labels2):
+    """mixup数据增强, 按比例融合两张图片
+    im:图片
+    labels:[N, 5], cls, box:xyxy
+    im2:图片
+    labels2:[M, 5], cls, box:xyxy
+    """
     # Applies MixUp augmentation https://arxiv.org/pdf/1710.09412.pdf
+    # 随机从beta分布中获取比例,range[0, 1]
     r = np.random.beta(32.0, 32.0)  # mixup ratio, alpha=beta=32.0
+    # 按照比例融合两张图片
     im = (im * r + im2 * (1 - r)).astype(np.uint8)
+    # 将两张图片标签拼接到一起
     labels = np.concatenate((labels, labels2), 0)
     return im, labels
 
