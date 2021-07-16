@@ -260,18 +260,28 @@ def copy_paste(im, labels, segments, p=0.5):
         # 从标签中随机选取p*n个目标
         for j in random.sample(range(n), k=round(p * n)):
             l, s = labels[j], segments[j]
-            # TODO
+            # box 为l标签框在im上水平镜像的框（y坐标不变，x坐标镜像）
             box = w - l[3], l[2], w - l[1], l[4]
+            # 计算box与所有labels的iou，这个iou是交集与labels框面积的比值，而不是与并集的比值
             ioa = bbox_ioa(box, labels[:, 1:5])  # intersection over area
+            # 如果box遮挡所有labels框的部分都不超过30%
             if (ioa < 0.30).all():  # allow 30% obscuration of existing labels
+                # 添加box对应的labels，segments
                 labels = np.concatenate((labels, [[l[0], *box]]), 0)
                 segments.append(np.concatenate((w - s[:, 0:1], s[:, 1:2]), 1))
+                # 画出该原mask的轮廓, 并用255填充mask区域
                 cv2.drawContours(im_new, [segments[j].astype(np.int32)], -1, (255, 255, 255), cv2.FILLED)
 
+        # cv2.bitwise_and利用掩膜（mask）进行“与”操作，即掩膜图像白色区域是对需要处理图像像素的保留，
+        # 黑色区域是对需要处理图像像素的剔除
+        # 获得该mask在原图上的结果，即保留原图中mask的区域，其他的为黑
         result = cv2.bitwise_and(src1=im, src2=im_new)
+        # 左右翻转的到需要贴到原图上的结果, 对应上面左右镜像得到的box
         result = cv2.flip(result, 1)  # augment segments (flip left-right)
+        # 选取resule中mask区域的索引
         i = result > 0  # pixels to replace
         # i[:, :] = result.max(2).reshape(h, w, 1)  # act over ch
+        # 再更新到原图上，就完成了将某个segment对象粘贴到它左右镜像的位置
         im[i] = result[i]  # cv2.imwrite('debug.jpg', im)  # debug
 
     return im, labels, segments

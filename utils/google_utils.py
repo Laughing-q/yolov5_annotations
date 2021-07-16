@@ -12,12 +12,14 @@ import torch
 
 
 def gsutil_getsize(url=''):
+    """获取谷歌云存储大小"""
     # gs://bucket/file size https://cloud.google.com/storage/docs/gsutil/commands/du
     s = subprocess.check_output(f'gsutil du {url}', shell=True).decode('utf-8')
     return eval(s.split(' ')[0]) if len(s) else 0  # bytes
 
 
 def safe_download(file, url, url2=None, min_bytes=1E0, error_msg=''):
+    """下载文件"""
     # Attempts to download file from url or url2, checks and removes incomplete downloads < min_bytes
     file = Path(file)
     assert_msg = f"Downloaded file '{file}' does not exist or size is < min_bytes={min_bytes}"
@@ -37,6 +39,7 @@ def safe_download(file, url, url2=None, min_bytes=1E0, error_msg=''):
 
 
 def attempt_download(file, repo='ultralytics/yolov5'):  # from utils.google_utils import *; attempt_download()
+    """如果本地没有找到file模型，则自动从github下载模型"""
     # Attempt file download if does not exist
     file = Path(str(file).strip().replace("'", ''))
 
@@ -59,6 +62,7 @@ def attempt_download(file, repo='ultralytics/yolov5'):  # from utils.google_util
             assets = ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt',
                       'yolov5s6.pt', 'yolov5m6.pt', 'yolov5l6.pt', 'yolov5x6.pt']
             try:
+                # 获取当前yolov5版本
                 tag = subprocess.check_output('git tag', shell=True, stderr=subprocess.STDOUT).decode().split()[-1]
             except:
                 tag = 'v5.0'  # current release
@@ -74,6 +78,7 @@ def attempt_download(file, repo='ultralytics/yolov5'):  # from utils.google_util
 
 
 def gdrive_download(id='16TiPfZj7htmTyhntwcZyEEAejOUxuT6m', file='tmp.zip'):
+    """从google云盘下载"""
     # Downloads a file from Google Drive. from yolov5.utils.google_utils import *; gdrive_download()
     t = time.time()
     file = Path(file)
