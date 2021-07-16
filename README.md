@@ -1,6 +1,8 @@
 代码版本：0714 commit #3996
 - [ ] models/yolo.py
 - [ ] models/common.py
+- [ ] hubconf.py
+- [ ] export.py
 
 
 <div align="center">
