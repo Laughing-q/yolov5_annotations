@@ -96,6 +96,7 @@ class MixConv2d(nn.Module):
 
 
 class Ensemble(nn.ModuleList):
+    """一个融合模型列表，保存多个模型, 最后将所有模型的预测拼接到一起"""
     # Ensemble of models
     def __init__(self):
         super(Ensemble, self).__init__()
@@ -106,16 +107,22 @@ class Ensemble(nn.ModuleList):
             y.append(module(x, augment, profile, visualize)[0])
         # y = torch.stack(y).max(0)[0]  # max ensemble
         # y = torch.stack(y).mean(0)  # mean ensemble
+        # 在第1维度拼接，也就是num_boxes的维度
         y = torch.cat(y, 1)  # nms ensemble
         return y, None  # inference, train output
 
 
 def attempt_load(weights, map_location=None, inplace=True):
+    """加载pt文件
+    weights可以是权重路径，也可以是一个保存多个权重路径的列表
+    """
     from models.yolo import Detect, Model
 
     # Loads an ensemble of models weights=[a,b,c] or a single model weights=[a] or weights=a
+    # 初始化一个融合模型列表
     model = Ensemble()
     for w in weights if isinstance(weights, list) else [weights]:
+        # 加载权重文件
         ckpt = torch.load(attempt_download(w), map_location=map_location)  # load
         model.append(ckpt['ema' if ckpt.get('ema') else 'model'].float().fuse().eval())  # FP32 model
 
@@ -126,10 +133,13 @@ def attempt_load(weights, map_location=None, inplace=True):
         elif type(m) is Conv:
             m._non_persistent_buffers_set = set()  # pytorch 1.6.0 compatibility
 
+    # 如果只有一个模型，则直接返回该模型
     if len(model) == 1:
         return model[-1]  # return model
+    # 否则融合多个模型
     else:
         print(f'Ensemble created with {weights}\n')
+        # 更新融合模型的类别名属性, 步长属性
         for k in ['names']:
             setattr(model, k, getattr(model[-1], k))
         model.stride = model[torch.argmax(torch.tensor([m.stride.max() for m in model])).int()].stride  # max stride

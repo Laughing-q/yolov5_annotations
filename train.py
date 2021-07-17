@@ -32,7 +32,7 @@ from tqdm import tqdm
 FILE = Path(__file__).absolute()
 sys.path.append(FILE.parents[0].as_posix())  # add yolov5/ to path
 
-import test  # for end-of-epoch mAP
+import val  # for end-of-epoch mAP
 from models.experimental import attempt_load
 from models.yolo import Model
 from utils.autoanchor import check_anchors
@@ -59,9 +59,9 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
           ):
     # 从opt获取参数
     # 日志保存路径，轮次、批次、权重、进程序号(主要用于分布式训练)等，具体opt参数说明下面有注释
-    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, notest, nosave, workers, = \
+    save_dir, epochs, batch_size, weights, single_cls, evolve, data, cfg, resume, noval, nosave, workers, = \
         opt.save_dir, opt.epochs, opt.batch_size, opt.weights, opt.single_cls, opt.evolve, opt.data, opt.cfg, \
-        opt.resume, opt.notest, opt.nosave, opt.workers
+        opt.resume, opt.noval, opt.nosave, opt.workers
 
     # Directories
     # 获取记录训练日志的路径
@@ -173,7 +173,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     with torch_distributed_zero_first(RANK):
         check_dataset(data_dict)  # check
     train_path = data_dict['train']
-    test_path = data_dict['val']
+    val_path = data_dict['val']
 
     # Freeze
     """
@@ -290,7 +290,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     # 获取模型FPN层数
     nl = model.model[-1].nl  # number of detection layers (used for scaling hyp['obj'])
     # 检查输入图片分辨率确保能够整除总步长gs
-    imgsz, imgsz_test = [check_img_size(x, gs) for x in opt.img_size]  # verify imgsz are gs-multiples
+    imgsz, imgsz_val = [check_img_size(x, gs) for x in opt.img_size]  # verify imgsz are gs-multiples
 
     # DP mode
     # 分布式训练,参照:https://github.com/ultralytics/yolov5/issues/475
@@ -325,8 +325,8 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     # Process 0
     if RANK in [-1, 0]:
         # 创建测试集dataloader
-        testloader = create_dataloader(test_path, imgsz_test, batch_size // WORLD_SIZE * 2, gs, single_cls,
-                                       hyp=hyp, cache=opt.cache_images and not notest, rect=True, rank=-1,
+        valloader = create_dataloader(val_path, imgsz_val, batch_size // WORLD_SIZE * 2, gs, single_cls,
+                                       hyp=hyp, cache=opt.cache_images and not noval, rect=True, rank=-1,
                                        workers=workers,
                                        pad=0.5, prefix=colorstr('val: '))[0]
 
@@ -405,7 +405,7 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
     日志目录
     从哪个epoch开始训练
     """
-    logger.info(f'Image sizes {imgsz} train, {imgsz_test} test\n'
+    logger.info(f'Image sizes {imgsz} train, {imgsz_val} val\n'
                 f'Using {dataloader.num_workers} dataloader workers\n'
                 f'Logging results to {save_dir}\n'
                 f'Starting training for {epochs} epochs...')
@@ -555,14 +555,14 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             final_epoch = epoch + 1 == epochs
             # 对测试集进行测试，计算mAP等指标
             # 测试时使用的是EMA模型
-            if not notest or final_epoch:  # Calculate mAP
+            if not noval or final_epoch:  # Calculate mAP
                 wandb_logger.current_epoch = epoch + 1
-                results, maps, _ = test.run(data_dict,
+                results, maps, _ = val.run(data_dict,
                                             batch_size=batch_size // WORLD_SIZE * 2,
-                                            imgsz=imgsz_test,
+                                            imgsz=imgsz_val,
                                             model=ema.ema,
                                             single_cls=single_cls,
-                                            dataloader=testloader,
+                                            dataloader=valloader,
                                             save_dir=save_dir,
                                             save_json=is_coco and final_epoch,
                                             verbose=nc < 50 and final_epoch,
@@ -634,12 +634,12 @@ def train(hyp,  # path/to/hyp.yaml or hyp dictionary
             # 如果是coco数据集则单独再测试一次
             if is_coco:  # COCO dataset
                 for m in [last, best] if best.exists() else [last]:  # speed, mAP tests
-                    results, _, _ = test.run(data_dict,
+                    results, _, _ = val.run(data_dict,
                                              batch_size=batch_size // WORLD_SIZE * 2,
-                                             imgsz=imgsz_test,
+                                             imgsz=imgsz_val,
                                              model=attempt_load(m, device).half(),
                                              single_cls=single_cls,
-                                             dataloader=testloader,
+                                             dataloader=valloader,
                                              save_dir=save_dir,
                                              save_json=True,
                                              plots=False)
@@ -677,12 +677,12 @@ def parse_opt(known=False):
     rect:是否采用矩形训练，默认False
     resume:接着打断训练上次的结果接着训练
     nosave:不保存模型，默认False
-    notest:不进行test，默认False
+    noval:不进行val，默认False
     noautoanchor:不自动调整anchor，默认False
     evolve:是否进行超参数进化，默认False
     bucket:谷歌云盘bucket，一般不会用到
     cache-images:是否提前缓存图片到内存，以加快训练速度，默认False
-    image-weights:训练时对图片进行采样的权重
+    image-weights:训练时是否对图片进行采样的权重
     device:训练的设备，cpu；0(表示一个gpu设备cuda:0)；0,1,2,3(多个gpu设备)
     multi-scale:是否进行多尺度训练，默认False
     single-cls:数据集是否只有一个类别，默认False
@@ -709,11 +709,11 @@ def parse_opt(known=False):
     parser.add_argument('--hyp', type=str, default='data/hyps/hyp.scratch.yaml', help='hyperparameters path')
     parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--batch-size', type=int, default=16, help='total batch size for all GPUs')
-    parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='[train, test] image sizes')
+    parser.add_argument('--img-size', nargs='+', type=int, default=[640, 640], help='[train, val] image sizes')
     parser.add_argument('--rect', action='store_true', help='rectangular training')
     parser.add_argument('--resume', nargs='?', const=True, default=False, help='resume most recent training')
     parser.add_argument('--nosave', action='store_true', help='only save final checkpoint')
-    parser.add_argument('--notest', action='store_true', help='only test final epoch')
+    parser.add_argument('--noval', action='store_true', help='only val final epoch')
     parser.add_argument('--noautoanchor', action='store_true', help='disable autoanchor check')
     parser.add_argument('--evolve', type=int, nargs='?', const=300, help='evolve hyperparameters for x generations')
     parser.add_argument('--bucket', type=str, default='', help='gsutil bucket')
@@ -770,7 +770,7 @@ def main(opt):
         opt.data, opt.cfg, opt.hyp = check_file(opt.data), check_file(opt.cfg), check_file(opt.hyp)  # check files
         assert len(opt.cfg) or len(opt.weights), 'either --cfg or --weights must be specified'
         # 扩展image_size为[image_size, image_size]一个是训练size，一个是测试size
-        opt.img_size.extend([opt.img_size[-1]] * (2 - len(opt.img_size)))  # extend to 2 sizes (train, test)
+        opt.img_size.extend([opt.img_size[-1]] * (2 - len(opt.img_size)))  # extend to 2 sizes (train, val)
         opt.name = 'evolve' if opt.evolve else opt.name
         # 根据opt.save_dir生成目录
         opt.save_dir = str(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok or opt.evolve))
@@ -837,7 +837,7 @@ def main(opt):
                 hyp['anchors'] = 3
         assert LOCAL_RANK == -1, 'DDP mode not implemented for --evolve'
         # 使用进化算法时，仅在最后的epoch测试和保存
-        opt.notest, opt.nosave = True, True  # only test/save final epoch
+        opt.noval, opt.nosave = True, True  # only val/save final epoch
         # ei = [isinstance(x, (int, float)) for x in hyp.values()]  # evolvable indices
         yaml_file = Path(opt.save_dir) / 'hyp_evolved.yaml'  # save best result here
         if opt.bucket:
@@ -886,7 +886,7 @@ def main(opt):
                 while all(v == 1):  # mutate until a change occurs (prevent duplicates)
                     v = (g * (npr.random(ng) < mp) * npr.randn(ng) * npr.random() * s + 1).clip(0.3, 3.0)
                 # 将突变添加到base hyp上
-                # [i+7]是因为x中前七个数字为results的指标(P, R, mAP, F1, test_losses=(GIoU, obj, cls))，之后才是超参数hyp
+                # [i+7]是因为x中前七个数字为results的指标(P, R, mAP, F1, val_losses=(box, obj, cls))，之后才是超参数hyp
                 for i, k in enumerate(hyp.keys()):  # plt.hist(v.ravel(), 300)
                     hyp[k] = float(x[i + 7] * v[i])  # mutate
 
@@ -905,7 +905,7 @@ def main(opt):
             """
             写入results和对应的hyp到evolve.txt
             evolve.txt文件每一行为一次进化的结果
-            一行中前七个数字为(P, R, mAP, F1, test_losses=(GIoU, obj, cls))，之后为hyp
+            一行中前七个数字为(P, R, mAP, F1, val_losses=(box, obj, cls))，之后为hyp
             保存hyp到yaml文件
             """
             print_mutation(hyp.copy(), results, yaml_file, opt.bucket)

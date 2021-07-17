@@ -1,9 +1,40 @@
-代码版本：0714 commit #3996
-- [ ] models/yolo.py
-- [ ] models/common.py
+代码版本：0714 commit #4000
+```bash
+$ git clone https://github.com/ultralytics/yolov5
+$ cd yolov5
+$ git checkout 720aaa65c8873c0d87df09e3c1c14f3581d4ea61
+```
+
+[Yolov5网络结构图](https://blog.csdn.net/Q1u1NG/article/details/107511465)
+
 - [ ] hubconf.py
 - [ ] export.py
 
+下面的文件均有注释，有些没有用到的函数，以及网络结构模块等没有注释
+```plain
+yolov5_annotations
+├── data
+├── models
+│   ├── common.py
+│   ├── experimental.py
+│   ├── yolo.py
+├── utils
+│   ├── augmentations.py
+│   ├── autoanchor.py
+│   ├── datasets.py
+│   ├── general.py
+│   ├── loss.py
+│   ├── metrics.py
+│   ├── plots.py
+│   ├── torch_utils.py
+├── train.py
+├── val.py
+├── detect.py
+```
+--------
+原README分割线 
+
+--------
 
 <div align="center">
 <p>
@@ -204,7 +235,7 @@ We are super excited about our first-ever Ultralytics YOLOv5 🚀 EXPORT Competi
   
   * GPU Speed measures end-to-end time per image averaged over 5000 COCO val2017 images using a V100 GPU with batch size 32, and includes image preprocessing, PyTorch FP16 inference, postprocessing and NMS. 
   * EfficientDet data from [google/automl](https://github.com/google/automl) at batch size 8.
-  * **Reproduce** by `python test.py --task study --data coco.yaml --iou 0.7 --weights yolov5s6.pt yolov5m6.pt yolov5l6.pt yolov5x6.pt`
+  * **Reproduce** by `python val.py --task study --data coco.yaml --iou 0.7 --weights yolov5s6.pt yolov5m6.pt yolov5l6.pt yolov5x6.pt`
 </details>
 
 
@@ -230,10 +261,10 @@ We are super excited about our first-ever Ultralytics YOLOv5 🚀 EXPORT Competi
   <summary>Table Notes (click to expand)</summary>
   
   * AP<sup>test</sup> denotes COCO [test-dev2017](http://cocodataset.org/#upload) server results, all other AP results denote val2017 accuracy.  
-  * AP values are for single-model single-scale unless otherwise noted. **Reproduce mAP** by `python test.py --data coco.yaml --img 640 --conf 0.001 --iou 0.65`  
-  * Speed<sub>GPU</sub> averaged over 5000 COCO val2017 images using a GCP [n1-standard-16](https://cloud.google.com/compute/docs/machine-types#n1_standard_machine_types) V100 instance, and includes FP16 inference, postprocessing and NMS. **Reproduce speed** by `python test.py --data coco.yaml --img 640 --conf 0.25 --iou 0.45`  
+  * AP values are for single-model single-scale unless otherwise noted. **Reproduce mAP** by `python val.py --data coco.yaml --img 640 --conf 0.001 --iou 0.65`  
+  * Speed<sub>GPU</sub> averaged over 5000 COCO val2017 images using a GCP [n1-standard-16](https://cloud.google.com/compute/docs/machine-types#n1_standard_machine_types) V100 instance, and includes FP16 inference, postprocessing and NMS. **Reproduce speed** by `python val.py --data coco.yaml --img 640 --conf 0.25 --iou 0.45`  
   * All checkpoints are trained to 300 epochs with default settings and hyperparameters (no autoaugmentation). 
-  * Test Time Augmentation ([TTA](https://github.com/ultralytics/yolov5/issues/303)) includes reflection and scale augmentation. **Reproduce TTA** by `python test.py --data coco.yaml --img 1536 --iou 0.7 --augment`
+  * Test Time Augmentation ([TTA](https://github.com/ultralytics/yolov5/issues/303)) includes reflection and scale augmentation. **Reproduce TTA** by `python val.py --data coco.yaml --img 1536 --iou 0.7 --augment`
 </details>
 
 

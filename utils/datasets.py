@@ -49,6 +49,7 @@ def get_hash(paths):
 
 
 def exif_size(img):
+    """根据图片的信息获取图片的宽、高信息"""
     # Returns exif-corrected PIL size
     s = img.size  # (width, height)
     try:
@@ -91,6 +92,24 @@ def exif_transpose(image):
 
 def create_dataloader(path, imgsz, batch_size, stride, single_cls=False, hyp=None, augment=False, cache=False, pad=0.0,
                       rect=False, rank=-1, workers=8, image_weights=False, quad=False, prefix=''):
+    """根据LoadImagesAndLabels创建dataloader
+    参数解析：
+    path：包含图片路径的txt文件或者包含图片的文件夹路径
+    imgsz：网络输入图片大小
+    batch_size: 批次大小
+    stride：网络下采样最大总步长
+    single_cls：是否为单类
+    hyp：网络训练时的一些超参数，包括学习率等，这里主要用到里面一些关于数据增强(旋转、平移等)的系数
+    augment：是否进行数据增强
+    cache：是否提前缓存图片到内存，以便加快训练速度
+    pad：设置矩形训练的shape时进行的填充
+    rect：是否进行矩形训练
+    rank: 多卡训练时的进程编号
+    workers: 加载数据时的cpu进程数
+    image_weights:训练时是否对图片进行采样的权重
+    quad: 是否使用collate_fn4作为dataloader的选择函数
+    prefix: 一个标志，多为train/val，处理标签时保存cache文件会用到
+    """
     # Make sure only the first process in DDP process the dataset first, and the following others can use the cache
     with torch_distributed_zero_first(rank):
         dataset = LoadImagesAndLabels(path, imgsz, batch_size,

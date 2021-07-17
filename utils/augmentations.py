@@ -109,7 +109,7 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleF
     缩放(resize)到输入大小img_size的时候，如果没有设置上采样的话，则只进行下采样
     因为上采样图片会让图片模糊，对训练不友好影响性能。
     """
-    if not scaleup:  # only scale down, do not scale up (for better test mAP)
+    if not scaleup:  # only scale down, do not scale up (for better val mAP)
         r = min(r, 1.0)
 
     # Compute padding

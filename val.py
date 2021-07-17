@@ -44,7 +44,7 @@ def run(data,
         save_hybrid=False,  # save label+prediction hybrid results to *.txt
         save_conf=False,  # save confidences in --save-txt labels
         save_json=False,  # save a cocoapi-compatible JSON results file
-        project='runs/test',  # save to project/name
+        project='runs/val',  # save to project/name
         name='exp',  # save to project/name
         exist_ok=False,  # existing project/name ok, do not increment
         half=True,  # use FP16 half-precision inference
@@ -56,15 +56,15 @@ def run(data,
         compute_loss=None,
         ):
     """
-    :param model: 测试的模型，训练时调用test传入
-    :param dataloader: 测试集的dataloader，训练时调用test传入
+    :param model: 测试的模型，训练时调用val传入
+    :param dataloader: 测试集的dataloader，训练时调用val传入
     :param save_dir: 保存在测试时第一个batch的图片上画出标签框和预测框的图片路径
     :param plots: 是否绘制各种可视化，比如测试预测，混淆矩阵，PR曲线等
     :param wandb_looger: wandb可视化工具, train的时候传入
     :param compute_loss: 计算损失的对象实例, train的时候传入
     """
     # Initialize/load model and set device
-    # 判断是否在训练时调用test，如果是则获取训练时的设备
+    # 判断是否在训练时调用val，如果是则获取训练时的设备
     training = model is not None
     if training:  # called by train.py
         device = next(model.parameters()).device  # get model device
@@ -171,7 +171,7 @@ def run(data,
         t1 += time_synchronized() - t
 
         # Compute loss
-        # 如果是在训练时进行的test，则通过训练结果计算并返回测试集的box, obj, cls损失
+        # 如果是在训练时进行的val，则通过训练结果计算并返回测试集的box, obj, cls损失
         if compute_loss:
             loss += compute_loss([x.float() for x in train_out], targets)[1][:3]  # box, obj, cls
 
@@ -328,9 +328,9 @@ def run(data,
         # Plot images
         # 画出前三个batch的图片的ground truth和预测框并保存
         if plots and batch_i < 3:
-            f = save_dir / f'test_batch{batch_i}_labels.jpg'  # labels
+            f = save_dir / f'val_batch{batch_i}_labels.jpg'  # labels
             Thread(target=plot_images, args=(img, targets, paths, f, names), daemon=True).start()
-            f = save_dir / f'test_batch{batch_i}_pred.jpg'  # predictions
+            f = save_dir / f'val_batch{batch_i}_pred.jpg'  # predictions
             Thread(target=plot_images, args=(img, output_to_target(out), paths, f, names), daemon=True).start()
 
     # Compute statistics
@@ -371,7 +371,7 @@ def run(data,
         confusion_matrix.plot(save_dir=save_dir, names=list(names.values()))
         # wandb 显示信息，图片等
         if wandb_logger and wandb_logger.wandb:
-            val_batches = [wandb_logger.wandb.Image(str(f), caption=f.name) for f in sorted(save_dir.glob('test*.jpg'))]
+            val_batches = [wandb_logger.wandb.Image(str(f), caption=f.name) for f in sorted(save_dir.glob('val*.jpg'))]
             wandb_logger.log({"Validation": val_batches})
     if wandb_images:
         wandb_logger.log({"Bounding Box Debugger/Images": wandb_images})
@@ -444,7 +444,7 @@ def parse_opt():
     exist_ok: 是否重新创建日志文件, False时重新创建文件
     half:是否使用F16精度推理
     """
-    parser = argparse.ArgumentParser(prog='test.py')
+    parser = argparse.ArgumentParser(prog='val.py')
     parser.add_argument('--data', type=str, default='data/coco128.yaml', help='dataset.yaml path')
     parser.add_argument('--weights', nargs='+', type=str, default='yolov5s.pt', help='model.pt path(s)')
     parser.add_argument('--batch-size', type=int, default=32, help='batch size')
@@ -460,7 +460,7 @@ def parse_opt():
     parser.add_argument('--save-hybrid', action='store_true', help='save label+prediction hybrid results to *.txt')
     parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
     parser.add_argument('--save-json', action='store_true', help='save a cocoapi-compatible JSON results file')
-    parser.add_argument('--project', default='runs/test', help='save to project/name')
+    parser.add_argument('--project', default='runs/val', help='save to project/name')
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
@@ -476,7 +476,7 @@ def parse_opt():
 def main(opt):
     # 初始化logging
     set_logging()
-    print(colorstr('test: ') + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
+    print(colorstr('val: ') + ', '.join(f'{k}={v}' for k, v in vars(opt).items()))
     # 检查环境
     check_requirements(exclude=('tensorboard', 'thop'))
 
@@ -493,7 +493,7 @@ def main(opt):
 
     # task == 'study'时，就评估模型在各个尺度下的指标并可视化
     elif opt.task == 'study':  # run over a range of settings and save/plot
-        # python test.py --task study --data coco.yaml --iou 0.7 --weights yolov5s.pt yolov5m.pt yolov5l.pt yolov5x.pt
+        # python val.py --task study --data coco.yaml --iou 0.7 --weights yolov5s.pt yolov5m.pt yolov5l.pt yolov5x.pt
         x = list(range(256, 1536 + 128, 128))  # x axis (image sizes)
         for w in opt.weights if isinstance(opt.weights, list) else [opt.weights]:
             f = f'study_{Path(opt.data).stem}_{Path(w).stem}.txt'  # filename to save to
