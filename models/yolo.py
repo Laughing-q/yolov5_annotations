@@ -49,6 +49,7 @@ class Detect(nn.Module):
         self.register_buffer('anchor_grid', a.clone().view(self.nl, 1, -1, 1, 1, 2))  # shape(nl,1,na,1,1,2)
         # 检测头
         self.m = nn.ModuleList(nn.Conv2d(x, self.no * self.na, 1) for x in ch)  # output conv
+        # 是否直接在预测y上反算坐标并替换
         self.inplace = inplace  # use in-place ops (e.g. slice assignment)
 
     def forward(self, x):

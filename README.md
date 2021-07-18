@@ -7,8 +7,6 @@ $ git checkout 720aaa65c8873c0d87df09e3c1c14f3581d4ea61
 
 [Yolov5网络结构图](https://blog.csdn.net/Q1u1NG/article/details/107511465)
 
-- [ ] hubconf.py
-- [ ] export.py
 
 下面的文件均有注释，有些没有用到的函数，以及网络结构模块等没有注释
 ```plain
@@ -27,6 +25,9 @@ yolov5_annotations
 │   ├── metrics.py
 │   ├── plots.py
 │   ├── torch_utils.py
+│   ├── google_utils.py
+├── export.py
+├── hubconf.py
 ├── train.py
 ├── val.py
 ├── detect.py
