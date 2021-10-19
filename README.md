@@ -4,9 +4,13 @@ $ git clone https://github.com/ultralytics/yolov5
 $ cd yolov5
 $ git checkout 720aaa65c8873c0d87df09e3c1c14f3581d4ea61
 ```
+**这个代码只是注释版本哈，不是很建议直接运行。**
 
-[Yolov5网络结构图](https://blog.csdn.net/Q1u1NG/article/details/107511465)
+考虑到可能会有人直接运行，可能之后有时间会出一个新的6.0版本的注释emmmm.
+- [ ] yolov5-6.0
 
+---
+[Yolov5网络结构图(2.0-5.0)](https://blog.csdn.net/Q1u1NG/article/details/107511465)
 
 下面的文件均有注释，有些没有用到的函数，以及网络结构模块等没有注释
 ```plain
