@@ -6,8 +6,11 @@ $ git checkout 720aaa65c8873c0d87df09e3c1c14f3581d4ea61
 ```
 **这个代码只是注释版本哈，不是很建议直接运行。**
 
+
 考虑到可能会有人直接运行，可能之后有时间会出一个新的6.0版本的注释emmmm.
 - [ ] yolov5-6.0
+
+最近发现了一个更详细的`yolov5`注释版[yolov5-5.x-annotations](https://github.com/SCAU-HuKai/yolov5-5.x-annotations).
 
 ---
 [Yolov5网络结构图(2.0-5.0)](https://blog.csdn.net/Q1u1NG/article/details/107511465)
